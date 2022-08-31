@@ -76,14 +76,16 @@ if [ "$answer" == "y" ]; then
  echo -ne "\n"
  read -rep "Enter ssd or hdd: " type
  echo -ne "\n"
+ echo "You have selected: $type"
+    echo -ne "\n"
  if [ "$type" == "ssd" ]; then
     MOUNT_OPTIONS="noatime,compress=zstd,ssd,commit=120"
- else [ "$type" == "hdd" ]; then
+ elif [ "$type" == "hdd" ]; then
     MOUNT_OPTIONS="noatime,compress=zstd,commit=120"
+ else
+    echo "Invalid selection"
+    exit 1
  fi
-else
- echo "Exiting"
- exit 1
 fi
 }
 
