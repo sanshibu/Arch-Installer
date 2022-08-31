@@ -53,38 +53,38 @@ userinfo () {
 }
 
 disk_selection () {
-    clear
-    logo
+clear
+logo
+echo -ne "
+-----------------------------------------------
+ THIS WILL FORMAT YOUR DISK AND INSTALL NORARC
+ Please make sure you know what you are doing 
+ because all data on your disk will be lost.
+-----------------------------------------------
+"
+lsblk -n --output TYPE,KNAME,SIZE | awk '$1=="disk"{print "/dev/"$2"|"$3}'
+echo -ne "\n"
+read -rep "Enter the disk you want to install on (sda/nvme): " disk
+echo -ne "\n"
+echo "You have selected: $disk"
+echo -ne "\n"
+read -rep "Are you sure you want to install on this disk? [y/n]: " answer
+echo -ne "\n"
+if [ "$answer" == "y" ]; then
     echo -ne "
-    -----------------------------------------------
-     THIS WILL FORMAT YOUR DISK AND INSTALL NORARC
-     Please make sure you know what you are doing 
-     because all data on your disk will be lost.
-    -----------------------------------------------
-    "
-    lsblk -n --output TYPE,KNAME,SIZE | awk '$1=="disk"{print "/dev/"$2"|"$3}'
+    Is this an ssd or hdd?"
     echo -ne "\n"
-    read -rep "Enter the disk you want to install on (sda/nvme): " disk
+    read -rep "Enter ssd or hdd: " type
     echo -ne "\n"
-    echo "You have selected: $disk"
-    echo -ne "\n"
-    read -rep "Are you sure you want to install on this disk? [y/n]: " answer
-    echo -ne "\n"
-    if [ "$answer" == "y" ]; then
-        echo -ne "
-        Is this an ssd or hdd?"
-        echo -ne "\n"
-        read -rep "Enter ssd or hdd: " type
-        echo -ne "\n"
-        if [ "$type" == ssd ]; then
-            MOUNT_OPTIONS="noatime,compress=zstd,ssd,commit=120"
-        else [ "$type" == hdd ]; then
-            MOUNT_OPTIONS="noatime,compress=zstd,commit=120"
-        fi
-    else
-        echo "Exiting"
-        exit 1
+    if [ "$type" == ssd ]; then
+        MOUNT_OPTIONS="noatime,compress=zstd,ssd,commit=120"
+    else [ "$type" == hdd ]; then
+        MOUNT_OPTIONS="noatime,compress=zstd,commit=120"
     fi
+else
+    echo "Exiting"
+    exit 1
+fi
 }
 
 Desktop_Environment_Selection () {
