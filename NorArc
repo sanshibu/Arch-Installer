@@ -1,0 +1,523 @@
+#!/bin/bash
+#
+# This script is used to install the NorArc.
+
+
+logo_starter () {
+    echo -ne "
+----------------------------------------------
+       _   _                            
+      | \ | |            /\             
+      |  \| | ___  _ __ /  \   _ __ ___ 
+      | .   |/ _ \| '__/ /\ \ | '__/ __|
+      | |\  | (_) | | / ____ \| | | (__ 
+      |_| \_|\___/|_|/_/    \_\_|  \___|
+ 
+----------------------------------------------
+        AutoInstaller for Arch Linux
+----------------------------------------------
+"
+}
+
+logo () {
+    echo -ne "
+----------------------------------------------
+       _   _                            
+      | \ | |            /\             
+      |  \| | ___  _ __ /  \   _ __ ___ 
+      | .   |/ _ \| '__/ /\ \ | '__/ __|
+      | |\  | (_) | | / ____ \| | | (__ 
+      |_| \_|\___/|_|/_/    \_\_|  \___|
+ 
+----------------------------------------------
+"
+}
+
+
+userinfo () {
+    clear
+    read -p "Enter your username: " username
+    echo -ne "\n"
+    read -rs -p "Enter your password: " password1
+    echo -ne "\n"
+    read -rs -p "Please re-enter password: " password2
+    echo -ne "\n"
+    if [ "$password1" == "$password2" ]; then
+        echo "Passwords match!"
+    else
+        echo "Password is incorrect"
+        exit 1
+    fi
+    read -rep "Please enter your hostname: " nameofmachine
+    echo -ne "\n"
+}
+
+disk_selection () {
+    clear
+    logo
+    echo -ne "
+    -----------------------------------------------
+     THIS WILL FORMAT YOUR DISK AND INSTALL NORARC
+     Please make sure you know what you are doing 
+     because all data on your disk will be lost.
+    -----------------------------------------------
+    "
+    lsblk -n --output TYPE,KNAME,SIZE | awk '$1=="disk"{print "/dev/"$2"|"$3}'
+    echo -ne "\n"
+    read -rep "Enter the disk you want to install on (sda/nvme): " disk
+    echo -ne "\n"
+    echo "You have selected: $disk"
+    echo -ne "\n"
+    read -rep "Are you sure you want to install on this disk? [y/n]: " answer
+    echo -ne "\n"
+    if [ "$answer" == "y" ]; then
+        echo -ne "
+        Is this an ssd or hdd?"
+        echo -ne "\n"
+        read -rep "Enter ssd or hdd: " type
+        echo -ne "\n"
+        if [ "$type" == ssd ]; then
+            MOUNT_OPTIONS="noatime,compress=zstd,ssd,commit=120"
+        else [ "$type" == hdd ]; then
+            MOUNT_OPTIONS="noatime,compress=zstd,commit=120"
+        fi
+    else
+        echo "Exiting"
+        exit 1
+    fi
+}
+
+Desktop_Environment_Selection () {
+
+echo -ne "
+-----------------------------------------------
+         Available Desktop Environment
+-----------------------------------------------"
+echo -ne "\n"
+echo -ne "
+1) Gnome
+2) KDE Plasma
+3) Xfce
+4) LXDE
+5) Mate
+"
+echo -ne "\n"
+read -rep "Enter the number of the desktop environment you want to install: " desktop
+echo -ne "\n"
+if [ "$desktop" == 1 ] || ["desktop" == "Gnome"]; then
+    sudo pacman -S --noconfirm --needed gnome gnome-extra
+    echo "Gnome installed"
+elif [ "$desktop" == 2 ] || ["desktop" == "KDE Plasma"]; then
+    sudo pacman -S --noconfirm --needed plasma 
+    echo "KDE Plasma installed"
+elif [ "$desktop" == 3 ] || ["desktop" == "Xcfe"]; then
+    sudo pacman -S --noconfirm --needed xfce4 xfce4-goodies
+    echo "Xfce installed"
+elif [ "$desktop" == 4 ] || ["desktop" == "LXDE"]; then
+    sudo pacman -S --noconfirm --needed lxde lxde-gtk-theme
+    echo "LXDE installed"
+elif [ "$desktop" == 5 ] || ["desktop" == "Mate"]; then
+    sudo pacman -S --noconfirm --needed mate mate-extra
+    echo "Mate installed"
+else
+    echo "Exiting"
+    exit 1
+fi
+}
+
+volumesetup () {
+    clear
+    logo
+    btrfs subvolume create /mnt/@
+    btrfs subvolume create /mnt/@home
+    btrfs subvolume create /mnt/@var
+    btrfs subvolume create /mnt/@tmp
+    btrfs subvolume create /mnt/@.snapshots
+
+    umount /mnt
+
+    mount -o $MOUNT_OPTIONS,subvol=@ $partition3 /mnt
+
+    mkdir -p /mnt/{home,var,tmp,.snapshots}
+
+    mount -o $MOUNT_OPTIONS,subvol=@home $partition3 /mnt/home
+    mount -o $MOUNT_OPTIONS,subvol=@var $partition3 /mnt/var
+    mount -o $MOUNT_OPTIONS,subvol=@tmp $partition3 /mnt/tmp
+    mount -o $MOUNT_OPTIONS,subvol=@.snapshots $partition3 /mnt/.snapshots
+}
+
+preinstall () {
+clear
+echo "Updating the system clock...\n"
+timedatectl set-ntp true
+echo "System clock updated.\n"
+sleep 1
+
+echo "Updating archlinux keyring\n"
+pacman -Sy --noconfirm archlinux-keyring
+echo "archlinux-keyring updated.\n"
+sleep 1
+echo "\nInstalling the required packages...\n"
+pacman -Sy --noconfirm --needed pacman-contrib terminus-font ttf-dejavu ttf-droid ttf-roboto ttf-ubuntu-font-family wget curl git vim zsh
+echo "Required packages installed.\n"
+sleep 1
+setfont ter-v22b
+
+sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
+pacman -S --noconfirm --needed reflector rsync grub
+cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup
+
+iso=$(curl -4 ifconfig.co/country-iso)
+clear
+logo
+echo "Reflector is updating the mirrorlist...\n"
+reflector --verbose --country $iso --latest 5 --protocol https --sort rate --save /etc/pacman.d/mirrorlist
+echo "Mirrorlist updated.\n"
+sleep 1
+
+userinfo
+
+clear
+
+mkdir /mnt &>/dev/null # Hiding error message if any
+echo -ne "
+------------------------------------------------
+            Installing Prerequisites
+------------------------------------------------\n"
+sleep 1
+pacman -S --noconfirm --needed gptfdisk btrfs-progs glibc
+
+
+echo -ne "
+----------------------------------------------
+                Formating Disk
+----------------------------------------------
+"
+umount -A --recursive /mnt # unmount devices
+sleep 1
+
+disk_selection
+
+sgdisk -Z /dev/$disk
+sgdisk -a 2048 -o /dev/$disk
+
+sgdisk -n 1::+1M --typecode=1:ef02 --change-name=1:'BIOSBOOT' /dev/$disk
+sgdisk -n 2::+300M --typecode=2:ef00 --change-name=2:'EFI' /dev/$disk
+sgdisk -n 3::-0 --typecode=3:8300 --change-name=3:'ROOT' /dev/$disk
+
+if [[ ! -d "/sys/firmware/efi" ]]; then
+    sfdisk -A 1:set:2 /dev/$disk
+fi
+
+partprobe /dev/$disk
+
+echo -ne "
+----------------------------------------------
+           Creating the filesystems
+----------------------------------------------"
+
+if [[ "$disk" =~ "nvme" ]]; then
+    partition2="/dev/${disk}p2"
+    partition3="/dev/${disk}p3"
+else
+    partition2="/dev/${disk}2"
+    partition3="/dev/${disk}3"
+fi
+
+mkfs.vfat -F32 -n "EFI" $partition2
+mkfs.btrfs -L "ROOT" $partition3 -f
+mount -t btrfs $partition3 /mnt
+volumesetup
+
+echo -ne "Finished creating the filesystems.\n"
+sleep 1
+
+mkdir -p /mnt/boot/efi
+mount -t vfat -L "EFI" /mnt/boot/
+
+if ! grep -qs '/mnt' /proc/mounts; then
+    echo "Drive is not mounted can not continue"
+    echo "Rebooting in 3 Seconds ..." && sleep 1
+    echo "Rebooting in 2 Seconds ..." && sleep 1
+    echo "Rebooting in 1 Second ..." && sleep 1
+    reboot now
+fi
+
+echo -ne "
+----------------------------------------------
+           Installing the base system
+----------------------------------------------\n"
+sleep 1
+
+pacstrap /mnt base base-devel cryptsetup curl dialog e2fsprogs device-mapper gptfdisk grub inetutils less linux linux-firmware linux-headers lvm2 mkinitcpio mtools nano netctl nvme-cli os-prober reflector rsync sysfsutils xz zstd wget
+echo -ne "Base system installed.\n"
+sleep 1
+
+echo "keyserver hkp://keyserver.ubuntu.com" >> /mnt/etc/pacman.d/gnupg/gpg.conf
+cp etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
+genfstab -L /mnt >> /mnt/etc/fstab
+echo -ne "fstab generated.\n"
+
+echo -ne "
+-------------------------------------------------------------------------
+                    GRUB BIOS Bootloader Install & Check
+-------------------------------------------------------------------------
+"
+if [[ ! -d "/sys/firmware/efi" ]]; then
+    grub-install --boot-directory=/mnt/boot /dev/$disk
+else
+    pacstrap /mnt efibootmgr --noconfirm --needed
+fi
+
+echo -ne "
+--------------------------------------------
+           Configuring the system      
+    Checking for low memory systems<8G
+--------------------------------------------\n" 
+
+TOTAL_MEM=$(cat /proc/meminfo | grep -i 'memtotal' | grep -o '[[:digit:]]*')
+if [[  $TOTAL_MEM -lt 8000000 ]]; then
+    # Put swap into the actual system, not into RAM disk, otherwise there is no point in it, it'll cache RAM into RAM. So, /mnt/ everything.
+    mkdir -p /mnt/opt/swap # make a dir that we can apply NOCOW to to make it btrfs-friendly.
+    chattr +C /mnt/opt/swap # apply NOCOW, btrfs needs that.
+    dd if=/dev/zero of=/mnt/opt/swap/swapfile bs=1M count=2048 status=progress
+    chmod 600 /mnt/opt/swap/swapfile # set permissions.
+    chown root /mnt/opt/swap/swapfile
+    mkswap /mnt/opt/swap/swapfile
+    swapon /mnt/opt/swap/swapfile
+    # The line below is written to /mnt/ but doesn't contain /mnt/, since it's just / for the system itself.
+    echo "/opt/swap/swapfile	none	swap	sw	0	0" >> /mnt/etc/fstab # Add swap to fstab, so it KEEPS working after installation.
+fi
+echo -ne "Low memory system detected.\n"
+sleep 1
+
+clear
+}
+
+
+setup_norarc () {
+    logo_starter
+
+echo -ne "
+---------------------------------------------
+            Network Configuration
+---------------------------------------------\n"
+sleep 1
+pacman -S --noconfirm --needed networkmanager dhclient
+systemctl enable NetworkManager
+
+echo -ne "
+---------------------------------------------
+   Setting up mirrors for optimal download
+---------------------------------------------\n"
+
+pacman -S --noconfirm --needed pacman-contrib curl
+pacman -S --noconfirm --needed reflector rsync grub arch-install-scripts git
+
+cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup
+
+nc=$(grep -c ^processor /proc/cpuinfo)
+
+TOTAL_MEM=$(cat /proc/meminfo | grep -i 'memtotal' | grep -o '[[:digit:]]*')
+
+if [[  $TOTAL_MEM -gt 8000000 ]]; then
+sed -i "s/#MAKEFLAGS=\"-j2\"/MAKEFLAGS=\"-j$nc\"/g" /etc/makepkg.conf
+sed -i "s/COMPRESSXZ=(xz -c -z -)/COMPRESSXZ=(xz -c -T $nc -z -)/g" /etc/makepkg.conf
+fi
+
+echo -ne "
+----------------------------------------------
+   Setting up Language to US and set locale
+----------------------------------------------\n"
+sleep 1
+sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
+locale-gen
+TIMEZONE="$(curl --fail https://ipapi.co/timezone)"
+timedatectl --no-ask-password set-timezone "$TIMEZONE"
+echo -ne "Timezone set to $TIMEZONE.\n"
+sleep 1
+timedatectl --no-ask-password set-ntp 1
+localectl --no-ask-password set-locale LANG=en_US.UTF-8 LC_TIME=en_US.UTF-8
+echo -ne "Locale set to en_US.UTF-8.\n"
+sleep 1
+ln -sf /usr/share/zoneinfo/"$TIMEZONE" /etc/localtime
+
+sed -i 's/^# %wheel ALL=(ALL) NOPASSWD: ALL/%wheel ALL=(ALL) NOPASSWD: ALL/' /etc/sudoers
+sed -i 's/^# %wheel ALL=(ALL:ALL) NOPASSWD: ALL/%wheel ALL=(ALL:ALL) NOPASSWD: ALL/' /etc/sudoers
+echo -ne "Sudoers file updated.\n"
+sleep 1
+
+
+sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
+sed -i "/\[multilib\]/,/Include/"'s/^#//' /etc/pacman.conf
+
+
+pacman -Sy --noconfirm --needed
+
+echo -ne "
+----------------------------------------------
+           Installing the base system
+----------------------------------------------\n"
+
+echo -ne "
+Select the desktop environment you want to install.\n"
+sleep 1
+Desktop_Environment_Selection
+
+echo -ne "
+---------------------------------------------
+      Installing Microcode for your CPU
+---------------------------------------------\n"
+sleep 1
+proc_type=$(lscpu)
+if grep -E "GenuineIntel" <<< ${proc_type}; then
+    echo -ne "Intel CPU detected.\n"
+    sleep 1
+    pacman -S --noconfirm --needed intel-ucode
+    proc_ucode=intel-ucode.img
+elif grep -E "AuthenticAMD" <<< ${proc_type}; then
+    echo -ne "AMD CPU detected.\n"
+    sleep 1
+    pacman -S --noconfirm --needed amd-ucode
+    proc_ucode=amd-ucode.img
+fi
+
+echo -ne "
+--------------------------------------------
+  Installing Graphics Drivers for your GPU
+--------------------------------------------\n"
+sleep 1
+gpu_type=$(lspci | grep -i vga)
+if grep -E "NVIDIA|GeForce" <<< ${gpu_type}; then
+    echo -ne "NVIDIA GPU detected.\n"
+    sleep 1
+    pacman -S --noconfirm --needed nvidia nvidia-utils
+	nvidia-xconfig
+elif lspci | grep 'VGA' | grep -E "Radeon|AMD" <<< ${gpu_type}; then
+    echo -ne "AMD GPU detected.\n"
+    sleep 1
+    pacman -S --noconfirm --needed xf86-video-amdgpu 
+elif grep -E "Integrated Graphics Controller" <<< ${gpu_type}; then
+    echo -ne "Integrated graphics card detected.\n"
+    sleep 1
+    pacman -S --noconfirm --needed libva-intel-driver libvdpau-va-gl lib32-vulkan-intel vulkan-intel libva-intel-driver libva-utils lib32-mesa
+elif grep -E "Intel Corporation UHD" <<< ${gpu_type}; then
+    echo -ne "Intel graphics card detected.\n"
+    sleep 1
+    pacman -S --needed --noconfirm libva-intel-driver libvdpau-va-gl lib32-vulkan-intel vulkan-intel libva-intel-driver libva-utils lib32-mesa
+fi
+
+echo -ne "
+---------------------------------------
+              Adding User
+---------------------------------------"
+sleep 1
+if [ $(whoami) = "root" ]; then
+    groupadd libvirt
+    useradd -m -G wheel,libvirt -s /bin/bash $username
+    echo -ne "User $username created.\n"
+    sleep 1
+    echo -ne "Home directory created.\n"
+    sleep 1
+    echo -ne "Added to wheel and libvirt group.\n"
+    sleep 1
+    echo -ne "Default shell set to /bin/bash.\n"
+    sleep 1
+
+    echo "$username:$password" | chpasswd
+    echo -ne "Password set.\n"
+    sleep 1
+
+    cp -R $HOME/NorArc /home/$username
+    echo -ne "NorArc directory copied to home directory.\n"
+    sleep 1
+    chown -R $username: /home/$username/NorArc
+    echo -ne "NorArc directory ownership set to $username.\n"
+    sleep 1
+
+    echo $nameofmachine > /etc/hostname
+    echo -ne "Hostname set to $nameofmachine.\n"
+    sleep 1
+else
+    echo "You are already a user proceed with aur installs"
+fi
+
+clear
+
+logo
+
+if [[ -d "/sys/firmware/efi" ]]; then
+    grub-install --efi-directory=/boot $disk
+fi
+
+echo -ne "
+-----------------------------------------------
+   Enabling services and starting the system
+-----------------------------------------------\n"
+sleep 1
+if [[ $desktop == "kde"]]; then
+    systemctl enable sddm
+elif [[ $desktop == "gnome" ]]; then
+    systemctl enable gdm
+elif [[ $desktop == "xfce" ]]; then
+    systemctl enable lightdm
+elif [[ $desktop == "lxde" ]]; then
+    systemctl enable lxdm
+fi
+
+systemctl enable cups.service
+echo "  Cups enabled"
+ntpd -qg
+systemctl enable ntpd.service
+echo "  NTP enabled"
+systemctl disable dhcpcd.service
+echo "  DHCP disabled"
+systemctl stop dhcpcd.service
+echo "  DHCP stopped"
+systemctl enable NetworkManager.service
+echo "  NetworkManager enabled"
+systemctl enable bluetooth
+echo "  Bluetooth enabled"
+systemctl enable avahi-daemon.service
+echo "  Avahi enabled"
+
+echo -ne "
+--------------------------------
+  Cleaning up the installation
+--------------------------------\n"
+sleep 1
+
+sed -i 's/^%wheel ALL=(ALL) NOPASSWD: ALL/# %wheel ALL=(ALL) NOPASSWD: ALL/' /etc/sudoers
+sed -i 's/^%wheel ALL=(ALL:ALL) NOPASSWD: ALL/# %wheel ALL=(ALL:ALL) NOPASSWD: ALL/' /etc/sudoers
+# Add sudo rights
+sed -i 's/^# %wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/' /etc/sudoers
+sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
+
+cd $pwd
+
+rm -rf $HOME/NorArc
+
+}
+
+
+main() {
+logo_starter
+sleep 0.75
+echo -ne "
+ This script will install NorArc on your machine.
+ Please make sure you have an internet connection.
+ This script will take a while to run.\n\n"
+sleep 1
+echo "Press any key to continue...\n"
+read -n 1 -s
+
+preinstall
+
+arch-chroot /mnt setup_norarc
+
+logo_starter
+}
+
+main
+
+
