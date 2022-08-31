@@ -71,19 +71,19 @@ echo -ne "\n"
 read -rep "Are you sure you want to install on this disk? [y/n]: " answer
 echo -ne "\n"
 if [ "$answer" == "y" ]; then
-    echo -ne "
-    Is this an ssd or hdd?"
-    echo -ne "\n"
-    read -rep "Enter ssd or hdd: " type
-    echo -ne "\n"
-    if [ "$type" == ssd ]; then
-        MOUNT_OPTIONS="noatime,compress=zstd,ssd,commit=120"
-    else [ "$type" == hdd ]; then
-        MOUNT_OPTIONS="noatime,compress=zstd,commit=120"
-    fi
+ echo -ne "
+ Is this an ssd or hdd?"
+ echo -ne "\n"
+ read -rep "Enter ssd or hdd: " type
+ echo -ne "\n"
+ if [ "$type" == "ssd" ]; then
+    MOUNT_OPTIONS="noatime,compress=zstd,ssd,commit=120"
+ else [ "$type" == "hdd" ]; then
+    MOUNT_OPTIONS="noatime,compress=zstd,commit=120"
+ fi
 else
-    echo "Exiting"
-    exit 1
+ echo "Exiting"
+ exit 1
 fi
 }
 
