@@ -106,19 +106,19 @@ echo -ne "
 echo -ne "\n"
 read -rep "Enter the number of the desktop environment you want to install: " desktop
 echo -ne "\n"
-if [ "$desktop" == 1 ] || ["desktop" == "Gnome"]; then
+if [ "$desktop" == 1 ] || [ "$desktop" == "Gnome" ]; then
     sudo pacman -S --noconfirm --needed gnome gnome-extra
     echo "Gnome installed"
-elif [ "$desktop" == 2 ] || ["desktop" == "KDE Plasma"]; then
+elif [ "$desktop" == 2 ] || [ "$desktop" == "KDE Plasma" ]; then
     sudo pacman -S --noconfirm --needed plasma 
     echo "KDE Plasma installed"
-elif [ "$desktop" == 3 ] || ["desktop" == "Xcfe"]; then
+elif [ "$desktop" == 3 ] || [ "$desktop" == "Xcfe" ]; then
     sudo pacman -S --noconfirm --needed xfce4 xfce4-goodies
     echo "Xfce installed"
-elif [ "$desktop" == 4 ] || ["desktop" == "LXDE"]; then
+elif [ "$desktop" == 4 ] || [ "$desktop" == "LXDE" ]; then
     sudo pacman -S --noconfirm --needed lxde lxde-gtk-theme
     echo "LXDE installed"
-elif [ "$desktop" == 5 ] || ["desktop" == "Mate"]; then
+elif [ "$desktop" == 5 ] || [ "$desktop" == "Mate" ]; then
     sudo pacman -S --noconfirm --needed mate mate-extra
     echo "Mate installed"
 else
@@ -457,7 +457,7 @@ echo -ne "
    Enabling services and starting the system
 -----------------------------------------------\n"
 sleep 1
-if [[ $desktop == "kde"]]; then
+if [[ $desktop == "kde" ]]; then
     systemctl enable sddm
 elif [[ $desktop == "gnome" ]]; then
     systemctl enable gdm
